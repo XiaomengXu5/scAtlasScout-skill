@@ -1,0 +1,92 @@
+name: scAtlasScout
+version: "1.0.0"
+description: >
+  Retrieve, rank, and summarize publicly available scRNA-seq and snRNA-seq datasets
+  from GEO, SRA, and CellxGENE for any disease, tissue, or biological condition.
+  Returns a ranked Markdown table with accession IDs, inferred platforms, and
+  confidence scores. Does not perform downstream analysis or download raw data.
+
+inputs:
+  - name: disease
+    type: string
+    required: true
+    description: >
+      Disease, condition, or biological context to search for.
+      Accepts full names or recognized abbreviations (e.g., "LUAD", "pancreatic cancer",
+      "Alzheimer's disease"). Abbreviations are automatically expanded.
+
+  - name: species
+    type: string
+    required: false
+    default: "Human"
+    description: >
+      Target organism. Accepted values: "Human", "Mouse", or a specific species name.
+      Defaults to Human; falls back to Mouse only if no human data is found.
+
+  - name: organ
+    type: string
+    required: false
+    description: >
+      Tissue or organ of interest (e.g., "lung", "brain", "pancreas").
+      Used to narrow search results when provided.
+
+  - name: platform
+    type: string
+    required: false
+    default: "10X Chromium"
+    description: >
+      Preferred sequencing platform. Datasets matching this platform are ranked higher.
+      Accepted values include: "10X Chromium", "Smart-seq2", "Drop-seq", "inDrops",
+      "MARS-seq", "sci-RNA-seq", "Microwell-seq".
+
+  - name: modality
+    type: string
+    required: false
+    default: "scRNA-seq"
+    description: >
+      Single-cell modality to include. Accepted values: "scRNA-seq", "snRNA-seq",
+      "both". Defaults to "scRNA-seq"; includes snRNA-seq unless user specifies otherwise.
+
+  - name: result_count
+    type: integer
+    required: false
+    default: 10
+    description: >
+      Maximum number of results to return per database source (GEO, SRA, CellxGENE).
+      Total results may be up to 3× this value before deduplication and ranking.
+
+steps:
+  - id: query_expansion
+    description: >
+      Expand abbreviations and generate synonyms for the input disease/condition term.
+      Produces a comprehensive list of search terms to maximize recall across databases.
+    uses: prompts/ontology_expansion.md
+
+  - id: dataset_retrieval
+    description: >
+      Search each configured database using the expanded query terms.
+      Apply species and modality filters. Collect raw metadata records from all sources.
+    sources: [GEO, SRA, CellxGENE]
+
+  - id: filtering
+    description: >
+      Apply strict filters to exclude ineligible records and soft filters to penalize
+      lower-priority results. Flag potential cross-source duplicates.
+    uses: rules/filtering_rules.md
+
+  - id: platform_inference
+    description: >
+      Infer the sequencing platform for each dataset using a confidence-weighted
+      evidence hierarchy. Assign a platform label and confidence score (0.0–1.0).
+    uses: rules/platform_inference_rules.md
+
+  - id: formatting
+    description: >
+      Rank all passing records and render the final 9-column Markdown table.
+      Prepend a query interpretation note and append a summary paragraph.
+      Validate output structure against the output schema.
+    output_schema: schemas/output_schema.json
+
+outputs:
+  schema: schemas/output_schema.json
+  format: markdown_table

@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/scAtlasScout/skill/schemas/output_schema.json",
+  "title": "scAtlasScout Output Schema",
+  "description": "Schema for the top-level response returned by the scAtlasScout skill, wrapping an array of dataset records with query metadata.",
+  "type": "object",
+  "required": [
+    "query_interpretation",
+    "total_count",
+    "source_counts",
+    "platform_breakdown",
+    "warnings",
+    "datasets"
+  ],
+  "properties": {
+    "query_interpretation": {
+      "type": "string",
+      "description": "Human-readable note describing how the input query was interpreted, including any abbreviation expansions and synonyms applied. Example: '\"LUAD\" → lung adenocarcinoma (+ synonyms: lung cancer, NSCLC, pulmonary adenocarcinoma)'"
+    },
+    "total_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of dataset records returned after filtering and deduplication."
+    },
+    "source_counts": {
+      "type": "object",
+      "description": "Breakdown of result counts by source database.",
+      "required": ["GEO", "SRA", "CellxGENE"],
+      "properties": {
+        "GEO": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of records sourced from GEO."
+        },
+        "SRA": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of records sourced from SRA."
+        },
+        "CellxGENE": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of records sourced from CellxGENE."
+        }
+      },
+      "additionalProperties": false
+    },
+    "platform_breakdown": {
+      "type": "object",
+      "description": "Count of datasets per inferred platform label. Keys are platform label strings (e.g., '10X Chromium', 'Smart-seq2', 'Unknown'). Values are integer counts.",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "List of warning messages generated during retrieval or processing (e.g., unavailable sources, partial results).",
+      "items": {
+        "type": "string"
+      }
+    },
+    "datasets": {
+      "type": "array",
+      "description": "Ordered array of dataset records, ranked by species preference, platform preference, cell count, and recency.",
+      "items": {
+        "$ref": "#/definitions/DatasetRecord"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "DatasetRecord": {
+      "title": "DatasetRecord",
+      "description": "A single dataset record representing one scRNA-seq or snRNA-seq study from GEO, SRA, or CellxGENE.",
+      "type": "object",
+      "required": [
+        "accession",
+        "source",
+        "title",
+        "species",
+        "platform",
+        "platform_confidence",
+        "modality",
+        "cell_or_sample_count",
+        "year",
+        "url"
+      ],
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "Primary dataset identifier. Valid formats: GSE followed by digits (GEO), SRP/ERP/DRP followed by digits (SRA), or a UUID (CellxGENE).",
+          "examples": ["GSE123456", "SRP098765", "ERP012345", "3a928d6b-9f4e-4b2a-8c1d-0e5f6a7b8c9d"]
+        },
+        "source": {
+          "type": "string",
+          "enum": ["GEO", "SRA", "CellxGENE"],
+          "description": "The database from which this record was retrieved."
+        },
+        "title": {
+          "type": "string",
+          "description": "Full dataset title as recorded in the source database."
+        },
+        "species": {
+          "type": "string",
+          "description": "Normalized organism label. Values: 'Human', 'Mouse', or 'Other:<species_name>'.",
+          "examples": ["Human", "Mouse", "Other:Rattus norvegicus"]
+        },
+        "platform": {
+          "type": "string",
+          "description": "Inferred or stated sequencing platform. Canonical values: '10X Chromium', 'Smart-seq2', 'Drop-seq', 'inDrops', 'MARS-seq', 'sci-RNA-seq', 'Microwell-seq', 'Unknown'."
+        },
+        "platform_confidence": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Confidence score for the platform inference, ranging from 0.0 (no evidence) to 0.9 (explicit platform field). See rules/platform_inference_rules.md."
+        },
+        "modality": {
+          "type": "string",
+          "enum": ["scRNA-seq", "snRNA-seq", "multiome", "Unknown"],
+          "description": "Normalized sequencing modality."
+        },
+        "cell_or_sample_count": {
+          "type": "string",
+          "description": "Cell count (preferred) or sample count. Format: '<N> cells' or '<N> samples'. Use comma-separated thousands formatting.",
+          "examples": ["45,231 cells", "48 samples", "Unknown"]
+        },
+        "year": {
+          "type": "integer",
+          "minimum": 2000,
+          "maximum": 2030,
+          "description": "4-digit year of dataset submission or publication."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Direct URL to the dataset record in the source database, or to the associated publication DOI."
+        },
+        "is_duplicate_flag": {
+          "type": "boolean",
+          "default": false,
+          "description": "Set to true if this record is a suspected duplicate of another record in the results. See rules/filtering_rules.md for duplicate detection criteria."
+        },
+        "notes": {
+          "type": ["string", "null"],
+          "description": "Optional free-text notes, such as duplicate warnings, missing DOI notices, or platform conflict annotations.",
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
